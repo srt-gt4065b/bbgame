@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Brick Breaker</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Poppins:wght@300;400;600&display=swap');
+
+        :root {
+            --primary: #00f3ff;
+            --secondary: #ff00ff;
+            --bg: #0a0a12;
+            --panel: #161625;
+            --text: #ffffff;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            color: var(--primary);
+            text-shadow: 0 0 10px var(--primary);
+            margin-bottom: 20px;
+            font-size: 2.5rem;
+        }
+
+        #app-container {
+            position: relative;
+            width: 800px;
+            height: 600px;
+            background: var(--panel);
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.2);
+            overflow: hidden;
+        }
+
+        /* Login Screen */
+        #login-screen, #game-over-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 10, 18, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            transition: opacity 0.3s;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        input {
+            padding: 15px;
+            font-size: 1.2rem;
+            background: transparent;
+            border: 2px solid var(--primary);
+            color: var(--text);
+            border-radius: 5px;
+            margin-bottom: 20px;
+            outline: none;
+            text-align: center;
+            width: 300px;
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        button {
+            padding: 12px 30px;
+            font-size: 1.2rem;
+            background: var(--secondary);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: 'Orbitron', sans-serif;
+            transition: transform 0.2s, box-shadow 0.2s;
+            text-transform: uppercase;
+            box-shadow: 0 0 10px var(--secondary);
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px var(--secondary);
+        }
+
+        /* Game Screen */
+        canvas {
+            background: #000;
+            display: block;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 10px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.2rem;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        /* Leaderboard */
+        .leaderboard-container {
+            margin-top: 20px;
+            width: 80%;
+            max-height: 250px;
+            overflow-y: auto;
+            background: rgba(0,0,0,0.5);
+            border-radius: 5px;
+            padding: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th, td {
+            padding: 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        th {
+            color: var(--primary);
+        }
+
+        td:nth-child(3) {
+            text-align: right;
+            color: var(--secondary);
+            font-weight: bold;
+        }
+        
+        .rank-1 { color: #ffd700; }
+        .rank-2 { color: #c0c0c0; }
+        .rank-3 { color: #cd7f32; }
+
+        /* Warning Message */
+        #config-warning {
+            background: #ff4444;
+            color: white;
+            padding: 10px;
+            text-align: center;
+            position: absolute;
+            top: 0;
+            width: 100%;
+            z-index: 100;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="config-warning">Firebase 설정이 누락되었습니다. 코드를 열어 firebaseConfig를 수정해주세요.</div>
+
+    <h1>NEON BREAKER</h1>
+
+    <div id="app-container">
+        <!-- Login Screen -->
+        <div id="login-screen">
+            <h2 style="margin-bottom: 20px;">PILOT LOGIN</h2>
+            <input type="text" id="username" placeholder="Enter Your Name" maxlength="10">
+            <button id="btn-start">Game Start</button>
+        </div>
+
+        <!-- Game UI Layer -->
+        <div id="ui-layer" class="hidden">
+            <div>SCORE: <span id="score-display">0</span></div>
+            <div>LIVES: <span id="lives-display">3</span></div>
+        </div>
+
+        <!-- Canvas -->
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+        <!-- Game Over / Win Screen -->
+        <div id="game-over-screen" class="hidden">
+            <h2 id="end-title" style="font-size: 3rem; margin-bottom: 10px; text-shadow: 0 0 10px white;">GAME OVER</h2>
+            <p style="font-size: 1.5rem; margin-bottom: 20px;">Final Score: <span id="final-score" style="color:var(--primary)">0</span></p>
+            
+            <button id="btn-restart" style="margin-bottom: 20px;">Try Again</button>
+            
+            <div class="leaderboard-container">
+                <h3 style="text-align: center; margin-bottom: 10px; color: var(--primary);">TOP 10 COMMANDERS</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Name</th>
+                            <th>Score</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leaderboard-body">
+                        <!-- Data will be injected here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { getDatabase, ref, push, query, orderByChild, limitToLast, onValue } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+
+        // ==========================================
+        // 1. FIREBASE 설정 (이곳을 수정하세요)
+        // ==========================================
+        const firebaseConfig = {
+           apiKey: "AIzaSyCBCI8Typr9dWXPQF_so2CEjoq-s5lOa7k",
+  authDomain: "break-brick-game.firebaseapp.com",
+  databaseURL: "https://break-brick-game-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "break-brick-game",
+  storageBucket: "break-brick-game.firebasestorage.app",
+  messagingSenderId: "808885032022",
+  appId: "1:808885032022:web:179465aea2d0cdb30b97f7"
+        };
+
+        // Firebase 초기화 확인
+        let db;
+        try {
+            if (firebaseConfig.apiKey === "YOUR_API_KEY") {
+                document.getElementById('config-warning').style.display = 'block';
+                throw new Error("Firebase config not set");
+            }
+            const app = initializeApp(firebaseConfig);
+            db = getDatabase(app);
+            setupLeaderboardListener();
+        } catch (e) {
+            console.error("Firebase Init Error:", e);
+        }
+
+        // ==========================================
+        // 2. 게임 변수 및 설정
+        // ==========================================
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        
+        // Screens
+        const loginScreen = document.getElementById("login-screen");
+        const gameOverScreen = document.getElementById("game-over-screen");
+        const uiLayer = document.getElementById("ui-layer");
+
+        // Inputs & Displays
+        const usernameInput = document.getElementById("username");
+        const scoreDisplay = document.getElementById("score-display");
+        const livesDisplay = document.getElementById("lives-display");
+        const finalScoreDisplay = document.getElementById("final-score");
+        const endTitle = document.getElementById("end-title");
+
+        // Game State
+        let playerName = "";
+        let score = 0;
+        let lives = 3;
+        let gameRunning = false;
+        let animationId;
+
+        // Paddle
+        const paddleHeight = 15;
+        const paddleWidth = 100;
+        let paddleX = (canvas.width - paddleWidth) / 2;
+        let rightPressed = false;
+        let leftPressed = false;
+
+        // Ball
+        const ballRadius = 8;
+        let x = canvas.width / 2;
+        let y = canvas.height - 30;
+        let dx = 4;
+        let dy = -4;
+        let speedMultiplier = 1.05; // 공이 닿을 때마다 빨라짐
+
+        // Bricks
+        const brickRowCount = 6;
+        const brickColumnCount = 9;
+        const brickPadding = 10;
+        const brickOffsetTop = 50;
+        const brickOffsetLeft = 35;
+        const brickWidth = (canvas.width - (brickOffsetLeft * 2) - (brickPadding * (brickColumnCount - 1))) / brickColumnCount;
+        const brickHeight = 25;
+
+        let bricks = [];
+
+        // Particles (Effect)
+        let particles = [];
+
+        // ==========================================
+        // 3. 게임 로직
+        // ==========================================
+
+        function initBricks() {
+            bricks = [];
+            for(let c=0; c<brickColumnCount; c++) {
+                bricks[c] = [];
+                for(let r=0; r<brickRowCount; r++) {
+                    // 색상 다양화
+                    let color = `hsl(${r * 40 + c * 10}, 100%, 50%)`;
+                    bricks[c][r] = { x: 0, y: 0, status: 1, color: color };
+                }
+            }
+        }
+
+        function drawBall() {
+            ctx.beginPath();
+            ctx.arc(x, y, ballRadius, 0, Math.PI*2);
+            ctx.fillStyle = "#ffffff";
+            ctx.fill();
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = "#ffffff";
+            ctx.closePath();
+            ctx.shadowBlur = 0;
+        }
+
+        function drawPaddle() {
+            ctx.beginPath();
+            ctx.rect(paddleX, canvas.height-paddleHeight-10, paddleWidth, paddleHeight);
+            ctx.fillStyle = "#00f3ff";
+            ctx.fill();
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = "#00f3ff";
+            ctx.closePath();
+            ctx.shadowBlur = 0;
+        }
+
+        function drawBricks() {
+            let activeBricks = 0;
+            for(let c=0; c<brickColumnCount; c++) {
+                for(let r=0; r<brickRowCount; r++) {
+                    if(bricks[c][r].status === 1) {
+                        activeBricks++;
+                        const brickX = (c*(brickWidth+brickPadding))+brickOffsetLeft;
+                        const brickY = (r*(brickHeight+brickPadding))+brickOffsetTop;
+                        bricks[c][r].x = brickX;
+                        bricks[c][r].y = brickY;
+                        
+                        ctx.beginPath();
+                        ctx.rect(brickX, brickY, brickWidth, brickHeight);
+                        ctx.fillStyle = bricks[c][r].color;
+                        ctx.fill();
+                        ctx.closePath();
+                    }
+                }
+            }
+            
+            // 승리 조건 확인
+            if (activeBricks === 0 && gameRunning) {
+                endGame(true);
+            }
+        }
+
+        function createParticles(x, y, color) {
+            for(let i=0; i<8; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    dx: (Math.random() - 0.5) * 5,
+                    dy: (Math.random() - 0.5) * 5,
+                    life: 1.0,
+                    color: color
+                });
+            }
+        }
+
+        function drawParticles() {
+            for(let i=0; i<particles.length; i++) {
+                let p = particles[i];
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x, p.y, 4, 4);
+                p.x += p.dx;
+                p.y += p.dy;
+                p.life -= 0.02;
+            }
+            ctx.globalAlpha = 1.0;
+            particles = particles.filter(p => p.life > 0);
+        }
+
+        function collisionDetection() {
+            for(let c=0; c<brickColumnCount; c++) {
+                for(let r=0; r<brickRowCount; r++) {
+                    let b = bricks[c][r];
+                    if(b.status === 1) {
+                        if(x > b.x && x < b.x+brickWidth && y > b.y && y < b.y+brickHeight) {
+                            dy = -dy;
+                            b.status = 0;
+                            score += 10;
+                            scoreDisplay.innerText = score;
+                            createParticles(b.x + brickWidth/2, b.y + brickHeight/2, b.color);
+                            
+                            // 속도 약간 증가
+                            if (Math.abs(dx) < 8) {
+                                dx *= 1.01;
+                                dy *= 1.01;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        function draw() {
+            if (!gameRunning) return;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            drawBricks();
+            drawBall();
+            drawPaddle();
+            drawParticles();
+            collisionDetection();
+
+            // 공 이동 (벽 튕기기)
+            if(x + dx > canvas.width-ballRadius || x + dx < ballRadius) {
+                dx = -dx;
+            }
+            if(y + dy < ballRadius) {
+                dy = -dy;
+            } else if(y + dy > canvas.height-ballRadius-paddleHeight-10) {
+                // 패들 충돌 확인
+                if(x > paddleX && x < paddleX + paddleWidth) {
+                    // 패들 어디에 맞았는지에 따라 각도 조절 (재미 요소)
+                    let hitPoint = x - (paddleX + paddleWidth/2);
+                    dx = hitPoint * 0.15; // 각도 변경
+                    dy = -dy; 
+                } else if (y + dy > canvas.height-ballRadius) {
+                    // 바닥에 닿음 (생명 감소)
+                    lives--;
+                    livesDisplay.innerText = lives;
+                    if(!lives) {
+                        endGame(false);
+                    } else {
+                        // 공 위치 초기화
+                        x = canvas.width/2;
+                        y = canvas.height-30;
+                        dx = 4;
+                        dy = -4;
+                        paddleX = (canvas.width-paddleWidth)/2;
+                    }
+                }
+            }
+
+            x += dx;
+            y += dy;
+
+            // 패들 이동
+            if(rightPressed && paddleX < canvas.width-paddleWidth) {
+                paddleX += 7;
+            }
+            else if(leftPressed && paddleX > 0) {
+                paddleX -= 7;
+            }
+
+            animationId = requestAnimationFrame(draw);
+        }
+
+        // ==========================================
+        // 4. 게임 제어 및 이벤트
+        // ==========================================
+
+        function startGame() {
+            if (usernameInput.value.trim() === "") {
+                alert("이름을 입력해주세요!");
+                return;
+            }
+            
+            playerName = usernameInput.value.trim();
+            loginScreen.classList.add("hidden");
+            gameOverScreen.classList.add("hidden");
+            uiLayer.classList.remove("hidden");
+            
+            // Reset Variables
+            score = 0;
+            lives = 3;
+            dx = 4;
+            dy = -4;
+            x = canvas.width/2;
+            y = canvas.height-30;
+            paddleX = (canvas.width-paddleWidth)/2;
+            scoreDisplay.innerText = score;
+            livesDisplay.innerText = lives;
+            gameRunning = true;
+            
+            initBricks();
+            draw();
+        }
+
+        function endGame(isWin) {
+            gameRunning = false;
+            cancelAnimationFrame(animationId);
+            
+            finalScoreDisplay.innerText = score;
+            endTitle.innerText = isWin ? "MISSION COMPLETE" : "GAME OVER";
+            endTitle.style.color = isWin ? "var(--primary)" : "var(--secondary)";
+            
+            uiLayer.classList.add("hidden");
+            gameOverScreen.classList.remove("hidden");
+
+            // Firebase에 점수 저장
+            saveScoreToFirebase(playerName, score);
+        }
+
+        // 키보드 이벤트
+        document.addEventListener("keydown", (e) => {
+            if(e.key == "Right" || e.key == "ArrowRight") rightPressed = true;
+            else if(e.key == "Left" || e.key == "ArrowLeft") leftPressed = true;
+        });
+
+        document.addEventListener("keyup", (e) => {
+            if(e.key == "Right" || e.key == "ArrowRight") rightPressed = false;
+            else if(e.key == "Left" || e.key == "ArrowLeft") leftPressed = false;
+        });
+
+        // 버튼 이벤트
+        document.getElementById("btn-start").addEventListener("click", startGame);
+        document.getElementById("btn-restart").addEventListener("click", startGame);
+
+        // ==========================================
+        // 5. Firebase 연동 (점수 저장 및 순위표)
+        // ==========================================
+
+        function saveScoreToFirebase(name, score) {
+            if (!db) return;
+            const scoresRef = ref(db, 'scores');
+            push(scoresRef, {
+                name: name,
+                score: score,
+                timestamp: Date.now()
+            });
+        }
+
+        function setupLeaderboardListener() {
+            if (!db) return;
+            // 점수 기준 상위 10개 가져오기
+            const topScoresQuery = query(ref(db, 'scores'), orderByChild('score'), limitToLast(10));
+
+            onValue(topScoresQuery, (snapshot) => {
+                const data = snapshot.val();
+                const leaderboardBody = document.getElementById("leaderboard-body");
+                leaderboardBody.innerHTML = "";
+
+                if (data) {
+                    // Firebase는 오름차순으로 주기 때문에 배열로 변환 후 뒤집어야 함
+                    const scoresArray = Object.values(data).sort((a, b) => b.score - a.score);
+
+                    scoresArray.forEach((entry, index) => {
+                        const tr = document.createElement("tr");
+                        const rankClass = index < 3 ? `class="rank-${index + 1}"` : "";
+                        
+                        tr.innerHTML = `
+                            <td ${rankClass}>${index + 1}</td>
+                            <td>${entry.name}</td>
+                            <td>${entry.score}</td>
+                        `;
+                        leaderboardBody.appendChild(tr);
+                    });
+                } else {
+                    leaderboardBody.innerHTML = "<tr><td colspan='3' style='text-align:center'>No records yet</td></tr>";
+                }
+            });
+        }
+
+    </script>
+</body>
+</html>
